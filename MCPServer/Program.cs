@@ -1,8 +1,5 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using MCPServer;
 using Microsoft.Extensions.Configuration;
-using MCPServer;
 
 public class Program
 {
@@ -36,9 +33,9 @@ public class Program
         DisplayHeader();
 
         var configuration = BuildConfiguration();
-        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? 
+        var connectionString = configuration.GetConnectionString("DefaultConnection") ??
                               throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-        var baseUrl = configuration.GetValue<string>("ServerSettings:BaseUrl") ?? 
+        var baseUrl = configuration.GetValue<string>("ServerSettings:BaseUrl") ??
                      "http://localhost:8080/";
 
         ISqlConnectionFactory connectionFactory = new SqlConnectionFactory(connectionString);

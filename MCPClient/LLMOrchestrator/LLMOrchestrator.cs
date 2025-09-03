@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Text.Json;
-using System.Threading.Tasks;
 using LLMKit;
-using LLMKit.Providers;
 using MCPClient.DynamicExecutor;
+using System.Text.Json;
 
 namespace MCPClient.LLMOrchestrator
 {
@@ -21,7 +17,7 @@ namespace MCPClient.LLMOrchestrator
             _toolExecutor = toolExecutor ?? throw new ArgumentNullException(nameof(toolExecutor));
             _toolDiscoverer = toolDiscoverer ?? throw new ArgumentNullException(nameof(toolDiscoverer));
             _availableTools = toolDiscoverer.GetAvailableTools();
-            
+
             // Set system prompt for intelligent tool orchestration
             SetOrchestratorSystemPrompt();
         }
@@ -29,44 +25,55 @@ namespace MCPClient.LLMOrchestrator
         private void SetOrchestratorSystemPrompt()
         {
             var toolsDescription = GenerateToolsDescription();
-            
+
             var systemPrompt = $@"You are an intelligent database assistant that helps users by calling the appropriate tools based on their requests.
 
-                    AVAILABLE TOOLS:
-                    {toolsDescription}
+AVAILABLE TOOLS:
+{toolsDescription}
 
-                    IMPORTANT RULES:
-                    1. NEVER guess table names, column names, or SQL queries
-                    2. ONLY use the tools listed above - do not invent or assume any tools exist
-                    3. ALWAYS ask for clarification if you need specific table names or column names
-                    4. Use tools in the correct sequence to gather information before answering                  
-                    5. Some queries can be answered without knowning the column names.
-                   
-                    
-                   
-              
+IMPORTANT RULES:
+1. NEVER guess table names, column names, or SQL queries
+2. ONLY use the tools listed above - do not invent or assume any tools exist
+3. ALWAYS ask for clarification if you need specific table names or column names
+4. Use tools in the correct sequence to gather information before answering
+5. ALWAYS respond in the exact JSON format specified below - never use natural language
+6. Think step by step: first explore the database structure, then execute queries
 
-                    RESPONSE FORMAT:
-                    When you need to call tools, respond with this exact JSON format:
-                    {{
-                        ""action"": ""call_tool"",
-                        ""tool_name"": ""exact_tool_name_from_list"",
-                        ""parameters"": {{ ""param_name"": ""param_value"" }},
-                        ""reason"": ""why you are calling this tool"",
-                        
-                    }}
+ANALYTICAL THINKING PROCESS:
+- Start by deeply analyzing what the user wants to know and why
+- Identify the core data requirements and potential data relationships
+- Plan your investigative approach: what tools to call and in what strategic sequence
+- Think about what you expect to find and what questions the data might raise
+- Execute tools systematically while adapting your plan based on discoveries
+- Synthesize information from multiple sources to build comprehensive, insightful answers
+- Question your assumptions and validate understanding through data exploration
+- Consider edge cases and alternative interpretations of the data
+- If you encounter errors or missing information, ask targeted clarification questions
 
-                    When you have enough information to answer the user, respond with:
-                    {{
-                        ""action"": ""answer_user"",
-                        ""response"": ""your detailed answer based on the tool results""
-                    }}
+RESPONSE FORMAT - YOU MUST ALWAYS USE ONE OF THESE EXACT JSON FORMATS:
 
-                    When you need clarification, respond with:
-                    {{
-                        ""action"": ""ask_clarification"",
-                        ""question"": ""what specific information you need""
-                    }}";
+When you need to call a tool:
+{{
+    ""action"": ""call_tool"",
+    ""tool_name"": ""exact_tool_name_from_list"",
+    ""parameters"": {{ ""param_name"": ""param_value"" }},
+    ""reason"": ""Clear explanation of why this tool is needed and what information it will provide""
+}}
+
+When you have enough information to answer the user:
+{{
+    ""action"": ""answer_user"",
+    ""response"": ""Comprehensive, well-structured answer that directly addresses the user's question with clear explanations and insights from the data""
+}}
+
+When you need clarification:
+{{
+    ""action"": ""ask_clarification"",
+    ""question"": ""Specific, focused question that will help you provide a better answer""
+}}
+
+CRITICAL: You must respond with ONLY valid JSON in one of these three formats. Never use natural language, explanations, or any text outside the JSON structure.
+Remember: ""action"" is always the type (call_tool), ""tool_name"" is the actual tool name.";
 
             _llmClient.SetSystemMessage(systemPrompt);
         }
@@ -74,7 +81,7 @@ namespace MCPClient.LLMOrchestrator
         private string GenerateToolsDescription()
         {
             var description = new System.Text.StringBuilder();
-            
+
             foreach (var tool in _availableTools)
             {
                 description.AppendLine($"- {tool.Name}: {tool.Description}");
@@ -92,7 +99,7 @@ namespace MCPClient.LLMOrchestrator
                 }
                 description.AppendLine();
             }
-            
+
             return description.ToString();
         }
 
@@ -114,25 +121,33 @@ namespace MCPClient.LLMOrchestrator
                     iteration++;
                     Console.WriteLine($"--- Iteration {iteration} ---");
 
-                    // Get LLM decision                   
+                    // Get LLM decision
 
                     var llmResponse = await _llmClient.GenerateTextAsync(userPrompt);
-                   
 
                     conversationHistory.Add($"LLM Response: {llmResponse}");
 
                     // Parse LLM response
                     var decision = ParseLLMResponse(llmResponse);
-                    
+
                     switch (decision.Action)
                     {
                         case "call_tool":
                             var toolResult = await ExecuteToolCall(decision);
                             conversationHistory.Add($"Tool Result: {toolResult}");
-                            
+
                             // Add tool result to conversation context for next iteration
-                            userPrompt = $"Answer: '{originalUserPrompt}' based on result from: Previous tool '{decision.ToolName}' : returned: {toolResult}.";
-                          //userPrompt = $"Answer: '{originalUserPrompt}' based on  history: '{string.Join("\r\n", conversationHistory)}'";
+                            userPrompt = $@"Original Question: {originalUserPrompt}
+
+Previous Tool Results:
+- Tool '{decision.ToolName}' returned: {toolResult}
+
+Based on this information, analyze what you've learned and determine your next step:
+1. Do you have enough information to answer the user's question comprehensively?
+2. Do you need to call another tool to gather more data?
+3. Do you need clarification about something specific?
+
+Think strategically about what additional information would be most valuable and why.";
                             break;
 
                         case "answer_user":
@@ -192,18 +207,27 @@ namespace MCPClient.LLMOrchestrator
             {
                 // Try to parse as JSON first
                 var jsonResponse = JsonSerializer.Deserialize<JsonElement>(response);
-                
+
                 if (jsonResponse.TryGetProperty("action", out var action))
                 {
                     var actionValue = action.GetString();
-                    
+
                     switch (actionValue)
                     {
                         case "call_tool":
+                            if (!jsonResponse.TryGetProperty("tool_name", out var toolName))
+                            {
+                                return new LLMDecision
+                                {
+                                    Action = "ask_clarification",
+                                    Question = "Missing 'tool_name' field. Please include the tool name you want to call."
+                                };
+                            }
+
                             return new LLMDecision
                             {
                                 Action = "call_tool",
-                                ToolName = jsonResponse.GetProperty("tool_name").GetString() ?? "",
+                                ToolName = toolName.GetString() ?? "",
                                 Parameters = ParseParameters(jsonResponse.GetProperty("parameters")),
                                 Reason = jsonResponse.GetProperty("reason").GetString() ?? ""
                             };
@@ -221,6 +245,27 @@ namespace MCPClient.LLMOrchestrator
                                 Action = "ask_clarification",
                                 Question = jsonResponse.GetProperty("question").GetString() ?? ""
                             };
+
+                        default:
+                            return new LLMDecision
+                            {
+                                Action = "ask_clarification",
+                                Question = $"Invalid action '{actionValue}'. Must be one of: 'call_tool', 'answer_user', or 'ask_clarification'."
+                            };
+                    }
+                }
+                else
+                {
+                    // Check if the LLM is using the wrong structure (putting tool name in action field)
+                    if (jsonResponse.TryGetProperty("parameters", out var paramsElement) &&
+                        jsonResponse.TryGetProperty("reason", out var reasonElement))
+                    {
+                        // This looks like a malformed call_tool response
+                        return new LLMDecision
+                        {
+                            Action = "ask_clarification",
+                            Question = "Invalid JSON structure. The 'action' field should be 'call_tool', not the tool name. Please use the correct format."
+                        };
                     }
                 }
             }
@@ -242,7 +287,7 @@ namespace MCPClient.LLMOrchestrator
         private Dictionary<string, object> ParseParameters(JsonElement parametersElement)
         {
             var parameters = new Dictionary<string, object>();
-            
+
             foreach (var property in parametersElement.EnumerateObject())
             {
                 object value = property.Value.ValueKind switch
@@ -253,10 +298,10 @@ namespace MCPClient.LLMOrchestrator
                     JsonValueKind.False => false,
                     _ => property.Value.GetString() ?? ""
                 };
-                
+
                 parameters[property.Name] = value;
             }
-            
+
             return parameters;
         }
     }
