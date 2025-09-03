@@ -18,12 +18,18 @@ This solution provides a complete MCP ecosystem consisting of:
 - **Tool Discovery** via `tools.json` configuration
 - **Configurable** server settings through `appsettings.json`
 
+![MCP Server Interface](MCPServer/Assets/server.png)
+
 ### MCPClient
 - **LLM Orchestrator** for intelligent tool selection and execution
 - **Dynamic Tool Executor** for runtime tool invocation
 - **Health Checker** for server connectivity validation
 - **Interactive Console** for natural language database queries
 - **Multi-LLM Support** with configurable providers (OpenAI, DeepSeek, Gemini)
+
+![MCP Client Interface - Part 1](MCPClient/Assets/client-1.png)
+
+![MCP Client Interface - Part 2](MCPClient/Assets/client-2.png)
 
 ## Key Features
 
