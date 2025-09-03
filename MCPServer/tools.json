@@ -2,38 +2,37 @@
   "tools": [
     {
       "name": "health",
-      "description": "Health check endpoint to verify server status.",
+      "description": "Health check endpoint to verify server status. Use this tool to confirm the server is running and responsive before attempting other operations.",
       "parameters": {}
     },
     {
       "name": "executeSQL",
-      "description": "Executes SQL queries.",
+      "description": "Executes SQL queries against the database. Use this tool to run SELECT, INSERT, UPDATE, DELETE, or any other SQL statements. Always verify table names and structure exist before executing queries.",
       "parameters": {
         "query": {
           "type": "string",
-          "description": "The SQL query to run."
+          "description": "The SQL query to run. Must be valid SQL syntax."
         }
       }
     },
     {
       "name": "getTableSchema",
-      "description": "Gets table schema.",
+      "description": "Gets the detailed schema of a specific table including column names, data types, and constraints. Use this tool to understand the structure of a table before writing SQL queries against it.",
       "parameters": {
         "tableName": {
           "type": "string",
-          "description": "The name of the table."
+          "description": "The exact name of the table you want to examine. Must be a table that exists in the database."
         }
       }
     },
     {
       "name": "getDatabaseSchema",
-      "description": "Gets the full database schema.",
+      "description": "Gets the full database schema listing all available tables. Use this tool first to discover what tables exist in the database before attempting to query specific tables or get their schemas.",
       "parameters": {}
     },
-
     {
       "name": "getTools",
-      "description": "Returns all available tools and their parameters.",
+      "description": "Returns all available tools and their parameters. This is typically used internally for tool discovery and doesn't need to be called manually.",
       "parameters": {}
     }
   ]

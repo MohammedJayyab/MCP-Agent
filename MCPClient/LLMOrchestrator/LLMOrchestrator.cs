@@ -26,54 +26,57 @@ namespace MCPClient.LLMOrchestrator
         {
             var toolsDescription = GenerateToolsDescription();
 
-            var systemPrompt = $@"You are an intelligent database assistant that helps users by calling the appropriate tools based on their requests.
+            var systemPrompt = $@"You are an intelligent assistant that helps users by calling the appropriate tools based on their requests.
 
-AVAILABLE TOOLS:
-{toolsDescription}
+                    CRITICAL INSTRUCTION: You MUST ALWAYS respond with valid JSON format. NEVER use natural language responses.
+                    Your response must be parseable JSON starting with {{ and ending with }}.
+                    DO NOT wrap your response in markdown code blocks (```json) or any other formatting.
 
-IMPORTANT RULES:
-1. NEVER guess table names, column names, or SQL queries
-2. ONLY use the tools listed above - do not invent or assume any tools exist
-3. ALWAYS ask for clarification if you need specific table names or column names
-4. Use tools in the correct sequence to gather information before answering
-5. ALWAYS respond in the exact JSON format specified below - never use natural language
-6. Think step by step: first explore the database structure, then execute queries
+                    AVAILABLE TOOLS:
+                    {toolsDescription}
 
-ANALYTICAL THINKING PROCESS:
-- Start by deeply analyzing what the user wants to know and why
-- Identify the core data requirements and potential data relationships
-- Plan your investigative approach: what tools to call and in what strategic sequence
-- Think about what you expect to find and what questions the data might raise
-- Execute tools systematically while adapting your plan based on discoveries
-- Synthesize information from multiple sources to build comprehensive, insightful answers
-- Question your assumptions and validate understanding through data exploration
-- Consider edge cases and alternative interpretations of the data
-- If you encounter errors or missing information, ask targeted clarification questions
+                    CRITICAL RULES - NEVER VIOLATE THESE:
+                    1. NEVER guess or assume names, structures, or data that you haven't discovered
+                    2. NEVER invent or assume any tools exist beyond what's listed above
+                    3. If you don't know something, use tools to find out - don't guess
+                    4. Only proceed with specific operations after you have confirmed the information exists
 
-RESPONSE FORMAT - YOU MUST ALWAYS USE ONE OF THESE EXACT JSON FORMATS:
+                    RESPONSE FORMAT:
+                    The ""action"" field must be exactly one of: ""call_tool"", ""answer_user"", or ""ask_clarification""
+                    The ""tool_name"" field contains the specific tool you want to use from the available tools list
 
-When you need to call a tool:
-{{
-    ""action"": ""call_tool"",
-    ""tool_name"": ""exact_tool_name_from_list"",
-    ""parameters"": {{ ""param_name"": ""param_value"" }},
-    ""reason"": ""Clear explanation of why this tool is needed and what information it will provide""
-}}
+                    When you need to call tools, respond with this exact JSON format:
+                    {{
+                        ""action"": ""call_tool"",
+                        ""tool_name"": ""tool_name_from_available_list"",
+                        ""parameters"": {{ ""param_name"": ""param_value"" }},
+                        ""reason"": ""why you are calling this tool""
+                    }}
 
-When you have enough information to answer the user:
-{{
-    ""action"": ""answer_user"",
-    ""response"": ""Comprehensive, well-structured answer that directly addresses the user's question with clear explanations and insights from the data""
-}}
+                    When you have enough information to answer the user, respond with:
+                    {{
+                        ""action"": ""answer_user"",
+                        ""response"": ""your detailed answer based on the tool results, and consider to fix the user query if it was not correct.""
+                    }}
 
-When you need clarification:
-{{
-    ""action"": ""ask_clarification"",
-    ""question"": ""Specific, focused question that will help you provide a better answer""
-}}
+                    When you need clarification, respond with:
+                    {{
+                        ""action"": ""ask_clarification"",
+                        ""question"": ""what specific information you need""
+                    }}
+                    Note: The ""action"" field must be exactly one of: ""call_tool"", ""answer_user"", or ""ask_clarification"". Do not change these values.
 
-CRITICAL: You must respond with ONLY valid JSON in one of these three formats. Never use natural language, explanations, or any text outside the JSON structure.
-Remember: ""action"" is always the type (call_tool), ""tool_name"" is the actual tool name.";
+                    The ""tool_name"" field should contain the actual name of the tool you want to call as listed in AVAILABLE TOOLS.
+
+                    FINAL REMINDER: Your response MUST be valid JSON starting with {{ and ending with }}. No natural language allowed.
+
+                    SMART TOOL USAGE STRATEGY:
+                    1. Analyze the available tools and their descriptions to understand what each can do
+                    2. Use tools to understand the structure before attempting operations
+                    3. Only call operation tools after you have confirmed the target exists
+                    4. If a tool fails or returns errors, use other tools to investigate why
+                    5. Build your knowledge step by step through tool calls
+                    6. use the history of the conversation to fetch needed information";
 
             _llmClient.SetSystemMessage(systemPrompt);
         }
@@ -112,7 +115,6 @@ Remember: ""action"" is always the type (call_tool), ""tool_name"" is the actual
                 Console.WriteLine($"Processing user request: {userPrompt}");
                 Console.WriteLine();
 
-                var conversationHistory = new List<string>();
                 var maxIterations = 10; // Prevent infinite loops
                 var iteration = 0;
 
@@ -121,39 +123,48 @@ Remember: ""action"" is always the type (call_tool), ""tool_name"" is the actual
                     iteration++;
                     Console.WriteLine($"--- Iteration {iteration} ---");
 
-                    // Get LLM decision
+                    // First iteration: Let LLM analyze the user query and decide on tools
+                    if (iteration == 1)
+                    {
+                        var toolsSummary = string.Join(", ", _availableTools.Select(t => t.Name));
+                        userPrompt = $@"User Question: {originalUserPrompt}
+
+                    Available Tools: {toolsSummary}
+                    Analyze the user's question and decide which  tool to call first.";
+                    }
+                    else
+                    {
+                        // Subsequent iterations: Build context from previous tool results
+                        userPrompt = $@"Original Question: {originalUserPrompt}
+
+                        Previous Tool Results:
+                        {userPrompt}
+
+                        Based on the tool results above, determine your next step.
+                        Remember: decide which  tool to call first.";
+                    }
 
                     var llmResponse = await _llmClient.GenerateTextAsync(userPrompt);
 
-                    conversationHistory.Add($"LLM Response: {llmResponse}");
+                    // Log LLM response for debugging
+                    Console.ForegroundColor = ClientConfig.Colors.Info;
+                    Console.WriteLine($"LLM Response: {llmResponse}");
+                    Console.WriteLine();
 
                     // Parse LLM response
                     var decision = ParseLLMResponse(llmResponse);
+                    Thread.Sleep(1000); // Brief pause for readability
 
                     switch (decision.Action)
                     {
                         case "call_tool":
                             var toolResult = await ExecuteToolCall(decision);
-                            conversationHistory.Add($"Tool Result: {toolResult}");
 
-                            // Add tool result to conversation context for next iteration
-                            userPrompt = $@"Original Question: {originalUserPrompt}
-
-Previous Tool Results:
-- Tool '{decision.ToolName}' returned: {toolResult}
-
-Based on this information, analyze what you've learned and determine your next step:
-1. Do you have enough information to answer the user's question comprehensively?
-2. Do you need to call another tool to gather more data?
-3. Do you need clarification about something specific?
-
-Think strategically about what additional information would be most valuable and why.";
+                            // Build context for next iteration
+                            userPrompt = $@"Tool '{decision.ToolName}' returned: {toolResult}";
                             break;
 
                         case "answer_user":
-                            //Console.ForegroundColor = ClientConfig.Colors.Success;
-                            //Console.WriteLine("Final Answer:");
-                            //Console.WriteLine(decision.Response);
                             return decision.Response;
 
                         case "ask_clarification":
@@ -185,6 +196,14 @@ Think strategically about what additional information would be most valuable and
         {
             try
             {
+                // Validate tool name exists
+                var toolExists = _availableTools.Any(t => t.Name.Equals(decision.ToolName, StringComparison.OrdinalIgnoreCase));
+                if (!toolExists)
+                {
+                    var availableToolNames = string.Join(", ", _availableTools.Select(t => t.Name));
+                    return $"ERROR: Tool '{decision.ToolName}' not found. Available tools: {availableToolNames}. Please use only the tools listed above.";
+                }
+
                 Console.ForegroundColor = ClientConfig.Colors.Info;
                 Console.WriteLine($"Calling tool: {decision.ToolName}");
                 Console.WriteLine($"Reason: {decision.Reason}");
@@ -205,8 +224,11 @@ Think strategically about what additional information would be most valuable and
         {
             try
             {
-                // Try to parse as JSON first
-                var jsonResponse = JsonSerializer.Deserialize<JsonElement>(response);
+                // Clean the response to extract JSON from markdown code blocks or other formatting
+                var cleanedResponse = CleanResponse(response);
+
+                // Try to parse as JSON
+                var jsonResponse = JsonSerializer.Deserialize<JsonElement>(cleanedResponse);
 
                 if (jsonResponse.TryGetProperty("action", out var action))
                 {
@@ -269,11 +291,14 @@ Think strategically about what additional information would be most valuable and
                     }
                 }
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
-                // If JSON parsing fails, treat as a regular response
+                // If JSON parsing fails, log the actual response for debugging
                 Console.ForegroundColor = ClientConfig.Colors.Warning;
-                Console.WriteLine("LLM response is not in JSON format, treating as answer");
+                Console.WriteLine($"LLM response is not in JSON format:");
+                Console.WriteLine($"Raw response: {response}");
+                Console.WriteLine($"JSON parsing error: {ex.Message}");
+                Console.WriteLine("Treating as answer_user response");
             }
 
             // Default: treat as user answer
@@ -282,6 +307,40 @@ Think strategically about what additional information would be most valuable and
                 Action = "answer_user",
                 Response = response
             };
+        }
+
+        private string CleanResponse(string response)
+        {
+            // Remove markdown code blocks
+            if (response.Contains("```json"))
+            {
+                var startIndex = response.IndexOf("```json") + 7;
+                var endIndex = response.LastIndexOf("```");
+                if (endIndex > startIndex)
+                {
+                    response = response.Substring(startIndex, endIndex - startIndex).Trim();
+                }
+            }
+            else if (response.Contains("```"))
+            {
+                var startIndex = response.IndexOf("```") + 3;
+                var endIndex = response.LastIndexOf("```");
+                if (endIndex > startIndex)
+                {
+                    response = response.Substring(startIndex, endIndex - startIndex).Trim();
+                }
+            }
+
+            // Remove any leading/trailing whitespace and newlines
+            response = response.Trim();
+
+            // If the response starts with a newline, remove it
+            if (response.StartsWith("\n"))
+            {
+                response = response.TrimStart('\n');
+            }
+
+            return response;
         }
 
         private Dictionary<string, object> ParseParameters(JsonElement parametersElement)
