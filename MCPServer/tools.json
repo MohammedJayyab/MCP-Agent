@@ -1,0 +1,40 @@
+﻿{
+  "tools": [
+    {
+      "name": "health",
+      "description": "Health check endpoint to verify server status.",
+      "parameters": {}
+    },
+    {
+      "name": "executeSQL",
+      "description": "Executes SQL queries.",
+      "parameters": {
+        "query": {
+          "type": "string",
+          "description": "The SQL query to run."
+        }
+      }
+    },
+    {
+      "name": "getTableSchema",
+      "description": "Gets table schema.",
+      "parameters": {
+        "tableName": {
+          "type": "string",
+          "description": "The name of the table."
+        }
+      }
+    },
+    {
+      "name": "getDatabaseSchema",
+      "description": "Gets the full database schema.",
+      "parameters": {}
+    },
+
+    {
+      "name": "getTools",
+      "description": "Returns all available tools and their parameters.",
+      "parameters": {}
+    }
+  ]
+}

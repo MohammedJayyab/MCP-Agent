@@ -1,0 +1,91 @@
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Mono-specific files
+*.userprefs
+mono_crash.*
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleasePublic/
+[Oo]utput/
+[Bb]uild/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Tt]emp/
+[Tt]mp/
+*.log
+*.bak
+*.old
+
+# Visual Studio temporary files and caches
+*.ncb
+*.suo
+*.sdf
+*.cache
+*.dbmdl
+*.opendb
+*.tlog
+*.vspscc
+*.vssscc
+*.tmp
+*.vs/
+*.vsp
+*.vsps
+*.vssscc
+
+# NuGet package manager files
+packages/
+*.nupkg
+*.nuspec
+*.nuget/
+NuGet.Config
+# Do not ignore if it is a project with a centralized package management
+# dotnet restore will re-create this file
+!Directory.Packages.props
+
+# Rider-specific files
+.idea/
+.vs/
+*.sln.DotSettings.user
+*.sln.DotSettings
+
+# Windows-specific files
+Thumbs.db
+Desktop.ini
+
+# C++ specific
+*.ilk
+*.obj
+*.pdb
+*.lib
+*.dll
+*.exe
+*.exp
+
+# Common ignore files for IDEs and OS
+*.swp
+*~
+*.orig
+.DS_Store
+
+# Other
+*.zip
+*.tar
+*.gz
+*.iso
+
+# Configuration files (keep templates, ignore actual configs)
+appsettings.json
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
+
