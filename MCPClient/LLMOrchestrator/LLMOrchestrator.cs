@@ -125,12 +125,15 @@ namespace MCPClient.LLMOrchestrator
 
                     // First iteration: Let LLM analyze the user query and decide on tools
                     if (iteration == 1)
+
                     {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine(">>> Analyzing user question and available tools...");
                         var toolsSummary = string.Join(", ", _availableTools.Select(t => t.Name));
                         userPrompt = $@"User Question: {originalUserPrompt}
 
-                    Available Tools: {toolsSummary}
-                    Analyze the user's question and decide which  tool to call first.";
+                                Available Tools: {toolsSummary}
+                                Analyze the user's question and decide which  tool to call first.";
                     }
                     else
                     {
@@ -183,6 +186,12 @@ namespace MCPClient.LLMOrchestrator
                 Console.ForegroundColor = ClientConfig.Colors.Error;
                 Console.WriteLine("Maximum iterations reached");
                 return "Sorry, I couldn't complete your request within the allowed iterations.";
+            }
+            catch (LLMKit.Exceptions.LLMException llmEx)
+            {
+                Console.ForegroundColor = ClientConfig.Colors.Error;
+                Console.WriteLine($"LLM Error: {llmEx.Message} \r\n Des. : {llmEx.ToString()}");
+                return $"Sorry, an LLM error occurred: {llmEx.Message}";
             }
             catch (Exception ex)
             {
